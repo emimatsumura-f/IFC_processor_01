@@ -1,7 +1,7 @@
 import os
 import logging
 from datetime import datetime
-from flask import Blueprint, render_template, request, jsonify, send_file
+from flask import Blueprint, render_template, request, jsonify, send_file, Response
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -79,6 +79,12 @@ def upload_ifc():
                         if file_size:
                             progress = (bytes_written / file_size) * 100
                             logger.debug(f"Progress: {progress:.2f}% ({bytes_written}/{file_size} bytes)")
+                            # 進捗情報をレスポンスヘッダーに含める
+                            if request.environ.get('wsgi.multithread', False):
+                                response = Response()
+                                response.headers['X-Progress'] = str(progress)
+                                response.direct_passthrough = True
+
                     except Exception as chunk_error:
                         logger.error(f"Error writing chunk: {str(chunk_error)}", exc_info=True)
                         raise
@@ -114,7 +120,11 @@ def upload_ifc():
                     logger.error(f"Error removing file after db failure: {str(remove_error)}")
             return jsonify({'success': False, 'message': 'データベースの更新中にエラーが発生しました。'})
 
-        return jsonify({'success': True, 'message': 'ファイルのアップロードが完了しました。'})
+        return jsonify({
+            'success': True,
+            'message': 'ファイルのアップロードが完了しました。',
+            'progress': 100
+        })
     except RequestEntityTooLarge:
         logger.error("File too large")
         return jsonify({'success': False, 'message': 'ファイルサイズが大きすぎます（上限: 200MB）。'})

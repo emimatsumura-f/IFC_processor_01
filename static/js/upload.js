@@ -35,44 +35,44 @@ document.addEventListener('DOMContentLoaded', function() {
         progressBar.setAttribute('aria-valuenow', 0);
 
         try {
-            let progress = 0;
-            const progressInterval = setInterval(() => {
-                progress += 2;  // ゆっくりとした進行
-                if (progress <= 85) {  // 85%まで表示（実際のアップロード完了のマージンを確保）
-                    progressBar.style.width = `${progress}%`;
-                    progressBar.setAttribute('aria-valuenow', progress);
+            const xhr = new XMLHttpRequest();
+            xhr.upload.onprogress = function(e) {
+                if (e.lengthComputable) {
+                    const percentComplete = (e.loaded / e.total) * 100;
+                    progressBar.style.width = percentComplete + '%';
+                    progressBar.setAttribute('aria-valuenow', percentComplete);
                 }
-            }, 1000);  // 1秒ごとに更新
+            };
 
-            const response = await fetch('/upload/ifc', {
-                method: 'POST',
-                body: formData
-            });
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    const response = JSON.parse(xhr.responseText);
+                    if (response.success) {
+                        progressBar.style.width = '100%';
+                        progressBar.setAttribute('aria-valuenow', 100);
+                        setTimeout(() => {
+                            uploadProgress.classList.add('d-none');
+                            processBtn.disabled = false;
+                        }, 500);
 
-            clearInterval(progressInterval);
-
-            let data;
-            try {
-                data = await response.json();
-            } catch (parseError) {
-                console.error('JSON parse error:', parseError);
-                throw new Error('サーバーからの応答が不正です。時間をおいて再度お試しください。');
-            }
-
-            if (response.ok && data.success) {
-                progressBar.style.width = '100%';
-                progressBar.setAttribute('aria-valuenow', 100);
-                setTimeout(() => {
-                    uploadProgress.classList.add('d-none');
-                    processBtn.disabled = false;
-                }, 500);
-
-                if (data.message) {
-                    alert(data.message);
+                        if (response.message) {
+                            alert(response.message);
+                        }
+                    } else {
+                        throw new Error(response.message || 'アップロードに失敗しました。');
+                    }
+                } else {
+                    throw new Error('アップロードに失敗しました。');
                 }
-            } else {
-                throw new Error(data.message || 'アップロードに失敗しました。');
-            }
+            };
+
+            xhr.onerror = function() {
+                throw new Error('ネットワークエラーが発生しました。');
+            };
+
+            xhr.open('POST', '/upload/ifc', true);
+            xhr.send(formData);
+
         } catch (error) {
             console.error('Upload error:', error);
             uploadProgress.classList.add('d-none');
