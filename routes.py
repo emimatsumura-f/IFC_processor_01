@@ -26,19 +26,29 @@ def index():
 @main_bp.route('/upload/ifc', methods=['POST'])
 @login_required
 def upload_ifc():
-    if 'ifc_file' not in request.files:
-        return jsonify({'success': False, 'message': 'ファイルが選択されていません。'})
-
-    file = request.files['ifc_file']
-    if file.filename == '':
-        return jsonify({'success': False, 'message': 'ファイルが選択されていません。'})
-
-    if not file.filename.endswith('.ifc'):
-        return jsonify({'success': False, 'message': 'IFCファイルのみアップロード可能です。'})
-
     try:
+        if 'ifc_file' not in request.files:
+            return jsonify({'success': False, 'message': 'ファイルが選択されていません。'})
+
+        file = request.files['ifc_file']
+        if file.filename == '':
+            return jsonify({'success': False, 'message': 'ファイルが選択されていません。'})
+
+        if not file.filename.endswith('.ifc'):
+            return jsonify({'success': False, 'message': 'IFCファイルのみアップロード可能です。'})
+
         filename = secure_filename(file.filename)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
+
+        # 既存のファイルを確認し、必要に応じて名前を変更
+        base_name = os.path.splitext(filename)[0]
+        extension = os.path.splitext(filename)[1]
+        counter = 1
+        while os.path.exists(filepath):
+            filename = f"{base_name}_{counter}{extension}"
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            counter += 1
+
         file.save(filepath)
 
         ifc_file = IFCFile(
@@ -49,9 +59,9 @@ def upload_ifc():
         db.session.add(ifc_file)
         db.session.commit()
 
-        return jsonify({'success': True})
+        return jsonify({'success': True, 'message': 'ファイルのアップロードが完了しました。'})
     except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
+        return jsonify({'success': False, 'message': f'エラーが発生しました: {str(e)}'})
 
 @main_bp.route('/choice/material', methods=['POST'])
 @login_required

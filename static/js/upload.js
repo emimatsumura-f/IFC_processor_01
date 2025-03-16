@@ -34,22 +34,34 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             clearInterval(progressInterval);
-            const data = await response.json();
 
-            if (data.success) {
+            // レスポンスがJSONでない場合のエラーハンドリング
+            let data;
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                throw new Error('サーバーからの応答が不正です。');
+            }
+
+            if (response.ok && data.success) {
                 progressBar.style.width = '100%';
                 setTimeout(() => {
                     uploadProgress.classList.add('d-none');
                     processBtn.disabled = false;
                     uploadBtn.disabled = false;
                 }, 500);
+
+                if (data.message) {
+                    alert(data.message);
+                }
             } else {
-                throw new Error(data.message);
+                throw new Error(data.message || 'アップロードに失敗しました。');
             }
         } catch (error) {
             uploadProgress.classList.add('d-none');
             uploadBtn.disabled = false;
-            alert('エラーが発生しました: ' + error.message);
+            progressBar.style.width = '0%';
+            alert(error.message || 'エラーが発生しました。');
         }
     });
 
