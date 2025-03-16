@@ -9,7 +9,6 @@ from app import db, UPLOAD_FOLDER
 from models import IFCFile, ProcessResult
 from ifc_processor import IFCProcessor
 
-# ロギングの設定
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -55,23 +54,43 @@ def upload_ifc():
 
         logger.info(f"Attempting to save file to: {filepath}")
         try:
-            # ファイルを大きなチャンクで読み書き
-            CHUNK_SIZE = 4 * 1024 * 1024  # 4MB chunks
+            # ファイルを1MBのチャンクで効率的に読み書き
+            CHUNK_SIZE = 1 * 1024 * 1024  # 1MB chunks
             with open(filepath, 'wb') as f:
                 bytes_written = 0
+                file_size = 0
+                try:
+                    # ファイルサイズを取得
+                    file.seek(0, 2)  # ファイルの末尾に移動
+                    file_size = file.tell()  # 現在の位置（＝ファイルサイズ）を取得
+                    file.seek(0)  # ファイルポインタを先頭に戻す
+                    logger.info(f"File size: {file_size} bytes")
+                except:
+                    logger.warning("Could not determine file size")
+
                 while True:
-                    chunk = file.stream.read(CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    bytes_written += len(chunk)
-                    logger.debug(f"Written {bytes_written} bytes")
+                    try:
+                        chunk = file.stream.read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        f.flush()  # バッファをディスクに書き込む
+                        bytes_written += len(chunk)
+                        if file_size:
+                            progress = (bytes_written / file_size) * 100
+                            logger.debug(f"Progress: {progress:.2f}% ({bytes_written}/{file_size} bytes)")
+                    except Exception as chunk_error:
+                        logger.error(f"Error writing chunk: {str(chunk_error)}", exc_info=True)
+                        raise
+
                 logger.info(f"File saved successfully, total size: {bytes_written} bytes")
+
         except Exception as save_error:
             logger.error(f"Error saving file: {str(save_error)}", exc_info=True)
             if os.path.exists(filepath):
                 try:
                     os.remove(filepath)
+                    logger.info("Cleaned up failed upload file")
                 except Exception as remove_error:
                     logger.error(f"Error removing failed upload: {str(remove_error)}")
             return jsonify({'success': False, 'message': 'ファイルの保存中にエラーが発生しました。'})
@@ -90,6 +109,7 @@ def upload_ifc():
             if os.path.exists(filepath):
                 try:
                     os.remove(filepath)
+                    logger.info("Cleaned up file after database error")
                 except Exception as remove_error:
                     logger.error(f"Error removing file after db failure: {str(remove_error)}")
             return jsonify({'success': False, 'message': 'データベースの更新中にエラーが発生しました。'})

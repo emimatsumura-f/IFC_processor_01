@@ -32,13 +32,15 @@ document.addEventListener('DOMContentLoaded', function() {
         processBtn.disabled = true;
         downloadBtn.disabled = true;
         progressBar.style.width = '0%';
+        progressBar.setAttribute('aria-valuenow', 0);
 
         try {
             let progress = 0;
             const progressInterval = setInterval(() => {
-                progress += 2;  // より遅い進行を示す
-                if (progress <= 90) {  // 90%まで表示
+                progress += 2;  // ゆっくりとした進行
+                if (progress <= 85) {  // 85%まで表示（実際のアップロード完了のマージンを確保）
                     progressBar.style.width = `${progress}%`;
+                    progressBar.setAttribute('aria-valuenow', progress);
                 }
             }, 1000);  // 1秒ごとに更新
 
@@ -59,6 +61,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             if (response.ok && data.success) {
                 progressBar.style.width = '100%';
+                progressBar.setAttribute('aria-valuenow', 100);
                 setTimeout(() => {
                     uploadProgress.classList.add('d-none');
                     processBtn.disabled = false;
@@ -73,9 +76,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('Upload error:', error);
             uploadProgress.classList.add('d-none');
-            uploadBtn.disabled = false;
             progressBar.style.width = '0%';
-            alert(error.message || 'エラーが発生しました。');
+            progressBar.setAttribute('aria-valuenow', 0);
+            alert(error.message || 'エラーが発生しました。時間をおいて再度お試しください。');
         } finally {
             uploadBtn.disabled = false;
             processBtn.disabled = false;
