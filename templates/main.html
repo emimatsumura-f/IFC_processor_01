@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="text-center">IFCファイルアップロード</h3>
+            </div>
+            <div class="card-body">
+                <form id="uploadForm" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="ifc_file" class="form-label">IFCファイルを選択</label>
+                        <input type="file" class="form-control" id="ifc_file" name="ifc_file" accept=".ifc" required>
+                    </div>
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary" id="uploadBtn">アップロード</button>
+                        <button type="button" class="btn btn-secondary" id="processBtn" disabled>材料集計実行</button>
+                        <button type="button" class="btn btn-success" id="downloadBtn" disabled>CSV出力</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="mt-4" id="resultArea" style="display: none;">
+            <div class="card">
+                <div class="card-header">
+                    <h4>処理結果</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>材料名</th>
+                                    <th>要素タイプ</th>
+                                    <th>長さ</th>
+                                    <th>幅</th>
+                                    <th>高さ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+{% endblock %}
