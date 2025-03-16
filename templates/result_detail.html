@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3>処理結果詳細</h3>
+                <div>
+                    <a href="{{ url_for('main.view_results') }}" class="btn btn-outline-primary me-2">一覧に戻る</a>
+                    <form method="POST" action="{{ url_for('main.download_csv') }}" class="d-inline">
+                        <input type="hidden" name="result_id" value="{{ result.id }}">
+                        <button type="submit" class="btn btn-success">CSV出力</button>
+                    </form>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <strong>ファイル名:</strong> {{ result.ifc_file.filename }}<br>
+                    <strong>処理日時:</strong> {{ result.processing_date.strftime('%Y-%m-%d %H:%M') }}
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>材料名</th>
+                                <th>要素タイプ</th>
+                                <th>長さ (mm)</th>
+                                <th>幅 (mm)</th>
+                                <th>高さ (mm)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for material in result.get_material_data() %}
+                            <tr>
+                                <td>{{ material.name or '-' }}</td>
+                                <td>{{ material.element_type or '-' }}</td>
+                                <td>{{ "%.2f"|format(material.length) if material.length else '-' }}</td>
+                                <td>{{ "%.2f"|format(material.width) if material.width else '-' }}</td>
+                                <td>{{ "%.2f"|format(material.height) if material.height else '-' }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
