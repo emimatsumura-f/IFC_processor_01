@@ -141,8 +141,12 @@ def process_materials():
             for material in materials:
                 material_dict = {}
                 for key, value in material.items():
-                    if isinstance(value, (int, float, str, bool, type(None))):
+                    if isinstance(value, (int, float)):
+                        material_dict[key] = float(value)
+                    elif isinstance(value, bool):
                         material_dict[key] = value
+                    elif value is None:
+                        material_dict[key] = None
                     else:
                         material_dict[key] = str(value)
                 materials_json.append(material_dict)
@@ -160,18 +164,23 @@ def process_materials():
             db.session.commit()
             logger.info("Processing results saved to database")
 
-            return jsonify({'success': True, 'materials': materials_json})
+            logger.debug(f"Returning JSON response: {materials_json}")
+            return jsonify({
+                'success': True,
+                'materials': materials_json,
+                'message': '材料集計が完了しました。'
+            })
 
         except ValueError as ve:
             logger.error(f"Value error during processing: {str(ve)}")
-            return jsonify({'success': False, 'message': str(ve)})
+            return jsonify({'success': False, 'message': f'データ処理エラー: {str(ve)}'})
         except Exception as e:
             logger.error(f"Unexpected error during processing: {str(e)}", exc_info=True)
             return jsonify({'success': False, 'message': '処理中に予期せぬエラーが発生しました。'})
 
     except Exception as e:
         logger.error(f"Error during material processing: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'message': str(e)})
+        return jsonify({'success': False, 'message': f'エラーが発生しました: {str(e)}'})
 
 @main_bp.route('/results')
 @login_required

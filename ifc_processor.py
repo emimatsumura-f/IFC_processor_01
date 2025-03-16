@@ -149,6 +149,7 @@ class IFCProcessor:
 
             for element in all_elements:
                 try:
+                    # 基本情報の取得
                     material_info = {
                         'name': element.Name if hasattr(element, 'Name') else None,
                         'element_type': element.is_a(),
@@ -170,13 +171,20 @@ class IFCProcessor:
                     if element_props:
                         material_info.update(element_props)
 
-                    # 数値データの型変換
+                    # 数値データの型変換と不正な値の除去
+                    cleaned_info = {}
                     for key, value in material_info.items():
                         if isinstance(value, (int, float, Decimal)):
-                            material_info[key] = float(value)
+                            cleaned_info[key] = float(value)
+                        elif isinstance(value, str):
+                            cleaned_info[key] = value.strip()
+                        elif value is None:
+                            cleaned_info[key] = None
+                        else:
+                            cleaned_info[key] = str(value)
 
-                    materials.append(material_info)
-                    logger.debug(f"Processed element {element.id()}: {material_info}")
+                    materials.append(cleaned_info)
+                    logger.debug(f"Processed element {element.id()}: {cleaned_info}")
 
                 except Exception as elem_error:
                     logger.warning(f"Error processing element {element.id()}: {str(elem_error)}")
