@@ -25,9 +25,13 @@
                             <tr>
                                 <th>材料名</th>
                                 <th>要素タイプ</th>
-                                <th>長さ (mm)</th>
+                                <th>断面タイプ</th>
+                                <th>せい (mm)</th>
                                 <th>幅 (mm)</th>
-                                <th>高さ (mm)</th>
+                                <th>ウェブ厚 (mm)</th>
+                                <th>フランジ厚 (mm)</th>
+                                <th>グレード</th>
+                                <th>呼び径</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -35,9 +39,13 @@
                             <tr>
                                 <td>{{ material.name or '-' }}</td>
                                 <td>{{ material.element_type or '-' }}</td>
-                                <td>{{ "%.2f"|format(material.length) if material.length else '-' }}</td>
-                                <td>{{ "%.2f"|format(material.width) if material.width else '-' }}</td>
-                                <td>{{ "%.2f"|format(material.height) if material.height else '-' }}</td>
+                                <td>{{ material.profile_type or '-' }}</td>
+                                <td>{{ "%.2f"|format(material.overall_depth) if material.overall_depth else '-' }}</td>
+                                <td>{{ "%.2f"|format(material.flange_width if material.flange_width else material.width) if material.flange_width or material.width else '-' }}</td>
+                                <td>{{ "%.2f"|format(material.web_thickness) if material.web_thickness else '-' }}</td>
+                                <td>{{ "%.2f"|format(material.flange_thickness) if material.flange_thickness else '-' }}</td>
+                                <td>{{ material.Grade or '-' }}</td>
+                                <td>{{ material.NominalDiameter or '-' }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
