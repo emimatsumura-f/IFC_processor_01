@@ -14,7 +14,6 @@ class IFCProcessor:
         self.ifc_file = None
         if file_path:
             try:
-                # パスの正規化
                 file_path = os.path.abspath(file_path)
                 self.ifc_file = ifcopenshell.open(file_path)
                 logger.info(f"Successfully opened IFC file: {file_path}")
@@ -30,28 +29,73 @@ class IFCProcessor:
         materials = []
         try:
             # 構造要素の取得
-            structural_items = self.ifc_file.by_type('IfcStructuralItem') or []
-            beams = self.ifc_file.by_type('IfcBeam') or []
-            columns = self.ifc_file.by_type('IfcColumn') or []
-            plates = self.ifc_file.by_type('IfcPlate') or []
-            members = self.ifc_file.by_type('IfcMember') or []
-            fasteners = self.ifc_file.by_type('IfcFastener') or []
+            elements = []
+            element_types = [
+                'IfcBeam', 'IfcColumn', 'IfcPlate', 'IfcMember',
+                'IfcStructuralCurveMember', 'IfcStructuralSurfaceMember'
+            ]
 
-            # 全ての要素を処理
-            all_elements = structural_items + beams + columns + plates + members + fasteners
-            logger.info(f"Found total {len(all_elements)} elements to process")
+            for element_type in element_types:
+                elements.extend(self.ifc_file.by_type(element_type) or [])
 
-            for element in all_elements:
+            logger.info(f"Found {len(elements)} elements to process")
+
+            for element in elements:
                 try:
-                    material_info = self._process_element(element)
-                    if material_info:
-                        materials.append(material_info)
-                        logger.debug(f"Successfully processed element: {element.GlobalId}")
-                except Exception as elem_error:
-                    logger.warning(f"Error processing element {element.id()}: {str(elem_error)}")
+                    info = {
+                        'name': getattr(element, 'Name', None),
+                        'element_type': element.is_a(),
+                        'global_id': getattr(element, 'GlobalId', None)
+                    }
+
+                    # プロファイル情報の取得
+                    if hasattr(element, 'Representation'):
+                        for rep in element.Representation.Representations:
+                            for item in rep.Items:
+                                if hasattr(item, 'SweptArea'):
+                                    profile = item.SweptArea
+                                    if profile.is_a('IfcIShapeProfileDef'):
+                                        info.update({
+                                            'profile_type': 'I形鋼',
+                                            'overall_depth': float(profile.OverallDepth),
+                                            'flange_width': float(profile.OverallWidth),
+                                            'web_thickness': float(profile.WebThickness),
+                                            'flange_thickness': float(profile.FlangeThickness)
+                                        })
+                                        break
+                                    elif profile.is_a('IfcRectangleProfileDef'):
+                                        info.update({
+                                            'profile_type': '矩形',
+                                            'width': float(profile.XDim),
+                                            'height': float(profile.YDim)
+                                        })
+                                        break
+
+                    # 材料情報の取得
+                    for rel in element.HasAssociations:
+                        if rel.is_a('IfcRelAssociatesMaterial'):
+                            material = rel.RelatingMaterial
+                            if material.is_a('IfcMaterial'):
+                                info['material_name'] = material.Name
+                                break
+
+                    # プロパティ情報の取得
+                    for definition in element.IsDefinedBy:
+                        if definition.is_a('IfcRelDefinesByProperties'):
+                            props = definition.RelatingPropertyDefinition
+                            if props.is_a('IfcPropertySet'):
+                                for prop in props.HasProperties:
+                                    if prop.Name in ['Grade', 'NominalDiameter', 'Length']:
+                                        if hasattr(prop, 'NominalValue'):
+                                            info[prop.Name.lower()] = prop.NominalValue.wrappedValue
+
+                    materials.append(info)
+                    logger.debug(f"Processed element: {info['global_id']}")
+
+                except Exception as e:
+                    logger.warning(f"Error processing element: {str(e)}")
                     continue
 
-            logger.info(f"Successfully processed {len(materials)} materials")
             return materials
 
         except Exception as e:
@@ -216,13 +260,12 @@ class IFCProcessor:
         try:
             output = StringIO()
             fieldnames = [
-                'name', 'element_type', 'global_id',
-                'material_name', 'material_type',
+                'name', 'element_type', 'material_name',
                 'profile_type', 'overall_depth', 'flange_width',
-                'web_thickness', 'flange_thickness',
-                'width', 'height', 'diameter',
-                'grade', 'nominal_diameter', 'type', 'length'
+                'web_thickness', 'flange_thickness', 'width', 'height',
+                'grade', 'nominal_diameter', 'length'
             ]
+
             writer = csv.DictWriter(output, fieldnames=fieldnames)
             writer.writeheader()
 
@@ -230,8 +273,8 @@ class IFCProcessor:
                 try:
                     row = {k: v for k, v in material.items() if k in fieldnames}
                     writer.writerow(row)
-                except Exception as row_error:
-                    logger.warning(f"Error writing row: {str(row_error)}")
+                except Exception as e:
+                    logger.warning(f"Error writing row: {str(e)}")
                     continue
 
             return output.getvalue()

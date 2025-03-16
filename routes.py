@@ -114,6 +114,7 @@ def upload_ifc():
 def process_materials():
     try:
         logger.info("Starting material processing")
+
         # 最新の未処理ファイルを取得
         ifc_file = IFCFile.query.filter_by(
             user_id=current_user.id,
@@ -122,80 +123,76 @@ def process_materials():
 
         if not ifc_file:
             logger.warning("No unprocessed IFC file found")
-            return jsonify({'success': False, 'message': 'IFCファイルが見つかりません。'}), 404
+            return jsonify({
+                'success': False,
+                'message': 'IFCファイルが見つかりません。'
+            }), 404
 
         filepath = os.path.join(UPLOAD_FOLDER, ifc_file.filename)
         if not os.path.exists(filepath):
             logger.error(f"IFC file not found at path: {filepath}")
-            return jsonify({'success': False, 'message': 'ファイルが見つかりません。'}), 404
+            return jsonify({
+                'success': False,
+                'message': 'ファイルが見つかりません。'
+            }), 404
 
         logger.info(f"Processing IFC file: {filepath}")
         processor = IFCProcessor(filepath)
+        materials = processor.extract_material_sizes()
 
-        try:
-            materials = processor.extract_material_sizes()
-            logger.info(f"Extracted {len(materials)} materials")
-
-            # 材料情報をJSONシリアライズ可能な形式に変換
-            materials_json = []
-            for material in materials:
-                material_dict = {}
-                for key, value in material.items():
-                    try:
-                        if isinstance(value, (int, float)):
-                            material_dict[key] = float(value)
-                        elif isinstance(value, bool):
-                            material_dict[key] = value
-                        elif value is None:
-                            material_dict[key] = None
-                        else:
-                            material_dict[key] = str(value)
-                    except Exception as conv_error:
-                        logger.warning(f"Error converting value for key {key}: {str(conv_error)}")
-                        material_dict[key] = str(value)
-                materials_json.append(material_dict)
-
-            logger.debug(f"Converted materials to JSON: {materials_json[:2]}")  # 最初の2件のみログ出力
-
-            # 処理結果を保存
-            result = ProcessResult(
-                ifc_file_id=ifc_file.id,
-                user_id=current_user.id,
-                processing_date=datetime.utcnow()
-            )
-            result.set_material_data(materials_json)
-
-            ifc_file.processed = True
-            db.session.add(result)
-            db.session.commit()
-            logger.info("Processing results saved to database")
-
-            response = jsonify({
-                'success': True,
-                'materials': materials_json,
-                'message': '材料集計が完了しました。'
-            })
-            response.headers['Content-Type'] = 'application/json'
-            return response
-
-        except ValueError as ve:
-            logger.error(f"Value error during processing: {str(ve)}")
+        if not materials:
+            logger.warning("No materials extracted from file")
             return jsonify({
                 'success': False,
-                'message': f'データ処理エラー: {str(ve)}'
+                'message': '材料情報を抽出できませんでした。'
             }), 400
-        except Exception as e:
-            logger.error(f"Unexpected error during processing: {str(e)}", exc_info=True)
-            return jsonify({
-                'success': False,
-                'message': '処理中に予期せぬエラーが発生しました。'
-            }), 500
+
+        logger.info(f"Extracted {len(materials)} materials")
+
+        # 材料情報をJSONシリアライズ可能な形式に変換
+        materials_json = []
+        for material in materials:
+            material_dict = {}
+            for key, value in material.items():
+                try:
+                    if isinstance(value, (int, float)):
+                        material_dict[key] = float(value)
+                    elif value is None:
+                        material_dict[key] = None
+                    else:
+                        material_dict[key] = str(value)
+                except Exception as conv_error:
+                    logger.warning(f"Error converting value for key {key}: {str(conv_error)}")
+                    material_dict[key] = str(value)
+            materials_json.append(material_dict)
+
+        # 処理結果を保存
+        result = ProcessResult(
+            ifc_file_id=ifc_file.id,
+            user_id=current_user.id,
+            processing_date=datetime.utcnow()
+        )
+        result.set_material_data(materials_json)
+
+        ifc_file.processed = True
+        db.session.add(result)
+        db.session.commit()
+
+        logger.info("Processing results saved to database")
+
+        response_data = {
+            'success': True,
+            'materials': materials_json,
+            'message': '材料集計が完了しました。'
+        }
+
+        return jsonify(response_data)
 
     except Exception as e:
         logger.error(f"Error during material processing: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
-            'message': f'エラーが発生しました: {str(e)}'
+            'message': '処理中にエラーが発生しました。'
         }), 500
 
 @main_bp.route('/results')
@@ -221,11 +218,9 @@ def download_csv():
     try:
         result_id = request.form.get('result_id')
         if result_id:
-            # 保存された結果からCSVを生成
             result = ProcessResult.query.get_or_404(result_id)
             materials = result.get_material_data()
         else:
-            # 最新の処理済みファイルからCSVを生成
             ifc_file = IFCFile.query.filter_by(
                 user_id=current_user.id,
                 processed=True
@@ -238,13 +233,18 @@ def download_csv():
             processor = IFCProcessor(filepath)
             materials = processor.extract_material_sizes()
 
-        processor = IFCProcessor(None)  # CSVジェネレーターのみ使用
+        if not materials:
+            return '材料情報が見つかりません。', 404
+
+        processor = IFCProcessor(None)
         csv_data = processor.generate_csv(materials)
 
-        return csv_data, 200, {
-            'Content-Type': 'text/csv',
-            'Content-Disposition': 'attachment; filename=material_list.csv'
-        }
+        return Response(
+            csv_data,
+            mimetype='text/csv',
+            headers={'Content-Disposition': 'attachment; filename=material_list.csv'}
+        )
+
     except Exception as e:
         logger.error(f"Error during CSV download: {str(e)}", exc_info=True)
         return str(e), 500
