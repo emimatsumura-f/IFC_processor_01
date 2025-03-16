@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 
 class User(UserMixin, db.Model):
+    __tablename__ = 'user'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
@@ -17,6 +18,7 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
 class IFCFile(db.Model):
+    __tablename__ = 'ifc_file'
     id = db.Column(db.Integer, primary_key=True)
     filename = db.Column(db.String(255), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -25,6 +27,7 @@ class IFCFile(db.Model):
     results = db.relationship('ProcessResult', backref='ifc_file', lazy=True)
 
 class ProcessResult(db.Model):
+    __tablename__ = 'process_result'
     id = db.Column(db.Integer, primary_key=True)
     ifc_file_id = db.Column(db.Integer, db.ForeignKey('ifc_file.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

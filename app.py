@@ -13,7 +13,6 @@ if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
 Base = declarative_base()
-db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 
 # Configuration
@@ -27,7 +26,7 @@ app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 200MB max file size
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Initialize extensions
-db.init_app(app)
+db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'auth.login'
