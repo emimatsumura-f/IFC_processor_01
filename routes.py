@@ -122,12 +122,12 @@ def process_materials():
 
         if not ifc_file:
             logger.warning("No unprocessed IFC file found")
-            return jsonify({'success': False, 'message': 'IFCファイルが見つかりません。'})
+            return jsonify({'success': False, 'message': 'IFCファイルが見つかりません。'}), 404
 
         filepath = os.path.join(UPLOAD_FOLDER, ifc_file.filename)
         if not os.path.exists(filepath):
             logger.error(f"IFC file not found at path: {filepath}")
-            return jsonify({'success': False, 'message': 'ファイルが見つかりません。'})
+            return jsonify({'success': False, 'message': 'ファイルが見つかりません。'}), 404
 
         logger.info(f"Processing IFC file: {filepath}")
         processor = IFCProcessor(filepath)
@@ -164,23 +164,33 @@ def process_materials():
             db.session.commit()
             logger.info("Processing results saved to database")
 
-            logger.debug(f"Returning JSON response: {materials_json}")
-            return jsonify({
+            response = jsonify({
                 'success': True,
                 'materials': materials_json,
                 'message': '材料集計が完了しました。'
             })
+            response.headers['Content-Type'] = 'application/json'
+            return response
 
         except ValueError as ve:
             logger.error(f"Value error during processing: {str(ve)}")
-            return jsonify({'success': False, 'message': f'データ処理エラー: {str(ve)}'})
+            return jsonify({
+                'success': False,
+                'message': f'データ処理エラー: {str(ve)}'
+            }), 400
         except Exception as e:
             logger.error(f"Unexpected error during processing: {str(e)}", exc_info=True)
-            return jsonify({'success': False, 'message': '処理中に予期せぬエラーが発生しました。'})
+            return jsonify({
+                'success': False,
+                'message': '処理中に予期せぬエラーが発生しました。'
+            }), 500
 
     except Exception as e:
         logger.error(f"Error during material processing: {str(e)}", exc_info=True)
-        return jsonify({'success': False, 'message': f'エラーが発生しました: {str(e)}'})
+        return jsonify({
+            'success': False,
+            'message': f'エラーが発生しました: {str(e)}'
+        }), 500
 
 @main_bp.route('/results')
 @login_required

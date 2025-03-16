@@ -81,8 +81,6 @@ document.addEventListener('DOMContentLoaded', function() {
             alert(error.message || 'エラーが発生しました。時間をおいて再度お試しください。');
         } finally {
             uploadBtn.disabled = false;
-            processBtn.disabled = false;
-            downloadBtn.disabled = false;
         }
     });
 
@@ -94,19 +92,35 @@ document.addEventListener('DOMContentLoaded', function() {
             resultArea.style.display = 'none';
 
             const response = await fetch('/choice/material', {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
             });
 
-            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
 
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('サーバーからの応答が不正です（JSONではありません）');
+            }
+
+            const data = await response.json();
             if (data.success) {
                 displayResults(data.materials);
                 downloadBtn.disabled = false;
                 resultArea.style.display = 'block';
+                if (data.message) {
+                    alert(data.message);
+                }
             } else {
-                throw new Error(data.message);
+                throw new Error(data.message || '処理に失敗しました。');
             }
         } catch (error) {
+            console.error('Processing error:', error);
             alert('処理に失敗しました: ' + error.message);
         } finally {
             processBtn.disabled = false;
@@ -119,23 +133,27 @@ document.addEventListener('DOMContentLoaded', function() {
             downloadBtn.disabled = true;
 
             const response = await fetch('/download/csv', {
-                method: 'POST'
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json'
+                }
             });
 
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'material_list.csv';
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                a.remove();
-            } else {
+            if (!response.ok) {
                 throw new Error('CSVのダウンロードに失敗しました');
             }
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'material_list.csv';
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            a.remove();
         } catch (error) {
+            console.error('Download error:', error);
             alert('エラーが発生しました: ' + error.message);
         } finally {
             downloadBtn.disabled = false;
