@@ -79,7 +79,7 @@ def upload_ifc():
         return jsonify({'success': True, 'message': 'ファイルのアップロードが完了しました。'})
     except RequestEntityTooLarge:
         logger.error("File too large")
-        return jsonify({'success': False, 'message': 'ファイルサイズが大きすぎます（上限: 100MB）。'})
+        return jsonify({'success': False, 'message': 'ファイルサイズが大きすぎます（上限: 200MB）。'})
     except Exception as e:
         logger.error(f"Error during file upload: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': f'エラーが発生しました: {str(e)}'})
