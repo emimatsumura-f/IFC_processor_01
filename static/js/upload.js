@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 data = await response.json();
             } catch (parseError) {
                 console.error('JSON parse error:', parseError);
-                throw new Error('サーバーからの応答が不正です。');
+                throw new Error('サーバーからの応答が不正です。時間をおいて再度お試しください。');
             }
 
             if (response.ok && data.success) {

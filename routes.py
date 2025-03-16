@@ -4,6 +4,7 @@ from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
+from werkzeug.exceptions import RequestEntityTooLarge
 from app import db
 from models import IFCFile, ProcessResult
 from ifc_processor import IFCProcessor
@@ -76,6 +77,9 @@ def upload_ifc():
         logger.info("File record created in database")
 
         return jsonify({'success': True, 'message': 'ファイルのアップロードが完了しました。'})
+    except RequestEntityTooLarge:
+        logger.error("File too large")
+        return jsonify({'success': False, 'message': 'ファイルサイズが大きすぎます（上限: 100MB）。'})
     except Exception as e:
         logger.error(f"Error during file upload: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': f'エラーが発生しました: {str(e)}'})
