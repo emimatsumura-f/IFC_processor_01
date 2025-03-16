@@ -114,6 +114,7 @@ def upload_ifc():
 def process_materials():
     try:
         logger.info("Starting material processing")
+        # 最新の未処理ファイルを取得
         ifc_file = IFCFile.query.filter_by(
             user_id=current_user.id,
             processed=False
@@ -130,34 +131,44 @@ def process_materials():
 
         logger.info(f"Processing IFC file: {filepath}")
         processor = IFCProcessor(filepath)
-        materials = processor.extract_material_sizes()
-        logger.info(f"Extracted {len(materials)} materials")
 
-        # 材料情報をJSONシリアライズ可能な形式に変換
-        materials_json = []
-        for material in materials:
-            material_dict = {}
-            for key, value in material.items():
-                if isinstance(value, (int, float, str, bool, type(None))):
-                    material_dict[key] = value
-                else:
-                    material_dict[key] = str(value)
-            materials_json.append(material_dict)
+        try:
+            materials = processor.extract_material_sizes()
+            logger.info(f"Extracted {len(materials)} materials")
 
-        # 処理結果を保存
-        result = ProcessResult(
-            ifc_file_id=ifc_file.id,
-            user_id=current_user.id,
-            processing_date=datetime.utcnow()
-        )
-        result.set_material_data(materials_json)
+            # 材料情報をJSONシリアライズ可能な形式に変換
+            materials_json = []
+            for material in materials:
+                material_dict = {}
+                for key, value in material.items():
+                    if isinstance(value, (int, float, str, bool, type(None))):
+                        material_dict[key] = value
+                    else:
+                        material_dict[key] = str(value)
+                materials_json.append(material_dict)
 
-        ifc_file.processed = True
-        db.session.add(result)
-        db.session.commit()
-        logger.info("Processing results saved to database")
+            # 処理結果を保存
+            result = ProcessResult(
+                ifc_file_id=ifc_file.id,
+                user_id=current_user.id,
+                processing_date=datetime.utcnow()
+            )
+            result.set_material_data(materials_json)
 
-        return jsonify({'success': True, 'materials': materials_json})
+            ifc_file.processed = True
+            db.session.add(result)
+            db.session.commit()
+            logger.info("Processing results saved to database")
+
+            return jsonify({'success': True, 'materials': materials_json})
+
+        except ValueError as ve:
+            logger.error(f"Value error during processing: {str(ve)}")
+            return jsonify({'success': False, 'message': str(ve)})
+        except Exception as e:
+            logger.error(f"Unexpected error during processing: {str(e)}", exc_info=True)
+            return jsonify({'success': False, 'message': '処理中に予期せぬエラーが発生しました。'})
+
     except Exception as e:
         logger.error(f"Error during material processing: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': str(e)})
