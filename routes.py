@@ -84,17 +84,25 @@ def upload_ifc():
 @login_required
 def process_materials():
     try:
+        logger.info("Starting material processing")
         ifc_file = IFCFile.query.filter_by(
             user_id=current_user.id,
             processed=False
         ).order_by(IFCFile.upload_date.desc()).first()
 
         if not ifc_file:
+            logger.warning("No unprocessed IFC file found")
             return jsonify({'success': False, 'message': 'IFCファイルが見つかりません。'})
 
         filepath = os.path.join(UPLOAD_FOLDER, ifc_file.filename)
+        if not os.path.exists(filepath):
+            logger.error(f"IFC file not found at path: {filepath}")
+            return jsonify({'success': False, 'message': 'ファイルが見つかりません。'})
+
+        logger.info(f"Processing IFC file: {filepath}")
         processor = IFCProcessor(filepath)
         materials = processor.extract_material_sizes()
+        logger.info(f"Extracted {len(materials)} materials")
 
         # 処理結果を保存
         result = ProcessResult(
@@ -106,9 +114,11 @@ def process_materials():
         ifc_file.processed = True
         db.session.add(result)
         db.session.commit()
+        logger.info("Processing results saved to database")
 
         return jsonify({'success': True, 'materials': materials})
     except Exception as e:
+        logger.error(f"Error during material processing: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': str(e)})
 
 @main_bp.route('/results')
@@ -159,4 +169,5 @@ def download_csv():
             'Content-Disposition': 'attachment; filename=material_list.csv'
         }
     except Exception as e:
+        logger.error(f"Error during CSV download: {str(e)}", exc_info=True)
         return str(e), 500
