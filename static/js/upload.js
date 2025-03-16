@@ -149,9 +149,14 @@ document.addEventListener('DOMContentLoaded', function() {
             row.innerHTML = `
                 <td>${material.name || '-'}</td>
                 <td>${material.element_type || '-'}</td>
+                <td>${material.profile_type || '-'}</td>
+                <td>${material.overall_depth ? material.overall_depth.toFixed(2) : '-'}</td>
+                <td>${material.flange_width ? material.flange_width.toFixed(2) : (material.width ? material.width.toFixed(2) : '-')}</td>
+                <td>${material.web_thickness ? material.web_thickness.toFixed(2) : '-'}</td>
+                <td>${material.flange_thickness ? material.flange_thickness.toFixed(2) : '-'}</td>
+                <td>${material.grade || '-'}</td>
+                <td>${material.nominal_diameter || '-'}</td>
                 <td>${material.length ? material.length.toFixed(2) : '-'}</td>
-                <td>${material.width ? material.width.toFixed(2) : '-'}</td>
-                <td>${material.height ? material.height.toFixed(2) : '-'}</td>
             `;
             resultTable.appendChild(row);
         });
