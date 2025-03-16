@@ -18,7 +18,7 @@
                 <ul class="navbar-nav">
                     {% if current_user.is_authenticated %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('main.view_results') }}">処理結果一覧</a>
+                        <a class="nav-link" href="{{ url_for('main.view_results') }}">過去データ参照</a>
                     </li>
                     {% endif %}
                 </ul>
