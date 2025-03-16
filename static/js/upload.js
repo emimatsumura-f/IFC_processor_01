@@ -3,12 +3,25 @@ document.addEventListener('DOMContentLoaded', function() {
     const uploadBtn = document.getElementById('uploadBtn');
     const processBtn = document.getElementById('processBtn');
     const downloadBtn = document.getElementById('downloadBtn');
+    const resetBtn = document.getElementById('resetBtn');
     const resultArea = document.getElementById('resultArea');
     const resultTable = document.getElementById('resultTable');
     const uploadProgress = document.getElementById('uploadProgress');
     const progressBar = uploadProgress.querySelector('.progress-bar');
     const totalItems = document.getElementById('totalItems');
     const processSpinner = processBtn.querySelector('.spinner-border');
+
+    // 新規ファイル選択ボタンのイベントハンドラ
+    resetBtn.addEventListener('click', function() {
+        uploadForm.reset();
+        uploadBtn.disabled = false;
+        processBtn.disabled = true;
+        downloadBtn.disabled = true;
+        resultArea.style.display = 'none';
+        uploadProgress.classList.add('d-none');
+        progressBar.style.width = '0%';
+        progressBar.setAttribute('aria-valuenow', 0);
+    });
 
     uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
@@ -31,6 +44,7 @@ document.addEventListener('DOMContentLoaded', function() {
         uploadBtn.disabled = true;
         processBtn.disabled = true;
         downloadBtn.disabled = true;
+        resetBtn.disabled = true;
         progressBar.style.width = '0%';
         progressBar.setAttribute('aria-valuenow', 0);
 
@@ -81,6 +95,7 @@ document.addEventListener('DOMContentLoaded', function() {
             alert(error.message || 'エラーが発生しました。時間をおいて再度お試しください。');
         } finally {
             uploadBtn.disabled = false;
+            resetBtn.disabled = false;
         }
     });
 
