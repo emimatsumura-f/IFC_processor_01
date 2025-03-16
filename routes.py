@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, send_file
 from flask_login import login_required, current_user
@@ -7,17 +8,21 @@ from app import db
 from models import IFCFile, ProcessResult
 from ifc_processor import IFCProcessor
 
+# ロギングの設定
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
 main_bp = Blueprint('main', __name__)
 
 UPLOAD_FOLDER = 'uploads'
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
+    logger.info(f"Created upload folder: {UPLOAD_FOLDER}")
 
 @main_bp.route('/')
 @main_bp.route('/main')
 @login_required
 def index():
-    # 最近の処理結果を取得
     recent_results = ProcessResult.query.filter_by(
         user_id=current_user.id
     ).order_by(ProcessResult.processing_date.desc()).limit(5).all()
@@ -28,14 +33,22 @@ def index():
 def upload_ifc():
     try:
         if 'ifc_file' not in request.files:
+            logger.warning("No file part in request")
             return jsonify({'success': False, 'message': 'ファイルが選択されていません。'})
 
         file = request.files['ifc_file']
         if file.filename == '':
+            logger.warning("No selected file")
             return jsonify({'success': False, 'message': 'ファイルが選択されていません。'})
 
         if not file.filename.endswith('.ifc'):
+            logger.warning(f"Invalid file type: {file.filename}")
             return jsonify({'success': False, 'message': 'IFCファイルのみアップロード可能です。'})
+
+        # アップロードフォルダの確認と作成
+        if not os.path.exists(UPLOAD_FOLDER):
+            logger.info("Creating upload folder")
+            os.makedirs(UPLOAD_FOLDER)
 
         filename = secure_filename(file.filename)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
@@ -49,7 +62,9 @@ def upload_ifc():
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             counter += 1
 
+        logger.info(f"Saving file to: {filepath}")
         file.save(filepath)
+        logger.info("File saved successfully")
 
         ifc_file = IFCFile(
             filename=filename,
@@ -58,9 +73,11 @@ def upload_ifc():
         )
         db.session.add(ifc_file)
         db.session.commit()
+        logger.info("File record created in database")
 
         return jsonify({'success': True, 'message': 'ファイルのアップロードが完了しました。'})
     except Exception as e:
+        logger.error(f"Error during file upload: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': f'エラーが発生しました: {str(e)}'})
 
 @main_bp.route('/choice/material', methods=['POST'])

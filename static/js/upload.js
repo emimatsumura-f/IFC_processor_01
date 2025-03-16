@@ -19,7 +19,6 @@ document.addEventListener('DOMContentLoaded', function() {
         progressBar.style.width = '0%';
 
         try {
-            // アップロード進捗のシミュレーション
             let progress = 0;
             const progressInterval = setInterval(() => {
                 progress += 10;
@@ -35,11 +34,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
             clearInterval(progressInterval);
 
-            // レスポンスがJSONでない場合のエラーハンドリング
             let data;
             try {
                 data = await response.json();
             } catch (parseError) {
+                console.error('JSON parse error:', parseError);
                 throw new Error('サーバーからの応答が不正です。');
             }
 
@@ -58,6 +57,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(data.message || 'アップロードに失敗しました。');
             }
         } catch (error) {
+            console.error('Upload error:', error);
             uploadProgress.classList.add('d-none');
             uploadBtn.disabled = false;
             progressBar.style.width = '0%';
