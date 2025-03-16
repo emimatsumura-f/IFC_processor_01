@@ -141,15 +141,21 @@ def process_materials():
             for material in materials:
                 material_dict = {}
                 for key, value in material.items():
-                    if isinstance(value, (int, float)):
-                        material_dict[key] = float(value)
-                    elif isinstance(value, bool):
-                        material_dict[key] = value
-                    elif value is None:
-                        material_dict[key] = None
-                    else:
+                    try:
+                        if isinstance(value, (int, float)):
+                            material_dict[key] = float(value)
+                        elif isinstance(value, bool):
+                            material_dict[key] = value
+                        elif value is None:
+                            material_dict[key] = None
+                        else:
+                            material_dict[key] = str(value)
+                    except Exception as conv_error:
+                        logger.warning(f"Error converting value for key {key}: {str(conv_error)}")
                         material_dict[key] = str(value)
                 materials_json.append(material_dict)
+
+            logger.debug(f"Converted materials to JSON: {materials_json[:2]}")  # 最初の2件のみログ出力
 
             # 処理結果を保存
             result = ProcessResult(
