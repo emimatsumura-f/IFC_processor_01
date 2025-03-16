@@ -5,57 +5,90 @@ document.addEventListener('DOMContentLoaded', function() {
     const downloadBtn = document.getElementById('downloadBtn');
     const resultArea = document.getElementById('resultArea');
     const resultTable = document.getElementById('resultTable');
+    const uploadProgress = document.getElementById('uploadProgress');
+    const progressBar = uploadProgress.querySelector('.progress-bar');
+    const totalItems = document.getElementById('totalItems');
+    const processSpinner = processBtn.querySelector('.spinner-border');
 
     uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
-        
+
         const formData = new FormData(uploadForm);
-        
+        uploadProgress.classList.remove('d-none');
+        uploadBtn.disabled = true;
+        progressBar.style.width = '0%';
+
         try {
+            // アップロード進捗のシミュレーション
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 10;
+                if (progress <= 90) {
+                    progressBar.style.width = `${progress}%`;
+                }
+            }, 200);
+
             const response = await fetch('/upload/ifc', {
                 method: 'POST',
                 body: formData
             });
-            
+
+            clearInterval(progressInterval);
             const data = await response.json();
-            
+
             if (data.success) {
-                processBtn.disabled = false;
-                alert('ファイルのアップロードが完了しました。');
+                progressBar.style.width = '100%';
+                setTimeout(() => {
+                    uploadProgress.classList.add('d-none');
+                    processBtn.disabled = false;
+                    uploadBtn.disabled = false;
+                }, 500);
             } else {
-                alert('アップロードに失敗しました: ' + data.message);
+                throw new Error(data.message);
             }
         } catch (error) {
-            alert('エラーが発生しました: ' + error);
+            uploadProgress.classList.add('d-none');
+            uploadBtn.disabled = false;
+            alert('エラーが発生しました: ' + error.message);
         }
     });
 
     processBtn.addEventListener('click', async function() {
         try {
+            processBtn.disabled = true;
+            processSpinner.classList.remove('d-none');
+            downloadBtn.disabled = true;
+            resultArea.style.display = 'none';
+
             const response = await fetch('/choice/material', {
                 method: 'POST'
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 displayResults(data.materials);
                 downloadBtn.disabled = false;
                 resultArea.style.display = 'block';
             } else {
-                alert('処理に失敗しました: ' + data.message);
+                throw new Error(data.message);
             }
         } catch (error) {
-            alert('エラーが発生しました: ' + error);
+            alert('処理に失敗しました: ' + error.message);
+        } finally {
+            processBtn.disabled = false;
+            processSpinner.classList.add('d-none');
         }
     });
 
     downloadBtn.addEventListener('click', async function() {
         try {
+            downloadBtn.disabled = true;
+
             const response = await fetch('/download/csv', {
                 method: 'POST'
             });
-            
+
             if (response.ok) {
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
@@ -67,10 +100,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.URL.revokeObjectURL(url);
                 a.remove();
             } else {
-                alert('CSVのダウンロードに失敗しました。');
+                throw new Error('CSVのダウンロードに失敗しました');
             }
         } catch (error) {
-            alert('エラーが発生しました: ' + error);
+            alert('エラーが発生しました: ' + error.message);
+        } finally {
+            downloadBtn.disabled = false;
         }
     });
 
@@ -79,13 +114,14 @@ document.addEventListener('DOMContentLoaded', function() {
         materials.forEach(material => {
             const row = document.createElement('tr');
             row.innerHTML = `
-                <td>${material.name}</td>
-                <td>${material.element_type}</td>
-                <td>${material.length || '-'}</td>
-                <td>${material.width || '-'}</td>
-                <td>${material.height || '-'}</td>
+                <td>${material.name || '-'}</td>
+                <td>${material.element_type || '-'}</td>
+                <td>${material.length ? material.length.toFixed(2) : '-'}</td>
+                <td>${material.width ? material.width.toFixed(2) : '-'}</td>
+                <td>${material.height ? material.height.toFixed(2) : '-'}</td>
             `;
             resultTable.appendChild(row);
         });
+        totalItems.textContent = `${materials.length} 件`;
     }
 });

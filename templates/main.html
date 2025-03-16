@@ -5,18 +5,30 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-header">
-                <h3 class="text-center">IFCファイルアップロード</h3>
+                <h3 class="text-center">IFCファイル処理</h3>
             </div>
             <div class="card-body">
                 <form id="uploadForm" method="POST" enctype="multipart/form-data">
                     <div class="mb-3">
                         <label for="ifc_file" class="form-label">IFCファイルを選択</label>
-                        <input type="file" class="form-control" id="ifc_file" name="ifc_file" accept=".ifc" required>
+                        <div class="input-group">
+                            <input type="file" class="form-control" id="ifc_file" name="ifc_file" accept=".ifc" required>
+                            <button type="submit" class="btn btn-primary" id="uploadBtn">
+                                アップロード
+                            </button>
+                        </div>
+                        <div class="progress mt-2 d-none" id="uploadProgress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
                     </div>
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-primary" id="uploadBtn">アップロード</button>
-                        <button type="button" class="btn btn-secondary" id="processBtn" disabled>材料集計実行</button>
-                        <button type="button" class="btn btn-success" id="downloadBtn" disabled>CSV出力</button>
+                        <button type="button" class="btn btn-secondary" id="processBtn" disabled>
+                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                            材料集計実行
+                        </button>
+                        <button type="button" class="btn btn-success" id="downloadBtn" disabled>
+                            CSVダウンロード
+                        </button>
                     </div>
                 </form>
             </div>
@@ -24,8 +36,9 @@
 
         <div class="mt-4" id="resultArea" style="display: none;">
             <div class="card">
-                <div class="card-header">
-                    <h4>処理結果</h4>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">処理結果</h4>
+                    <span class="badge bg-success" id="totalItems">0 件</span>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -34,9 +47,9 @@
                                 <tr>
                                     <th>材料名</th>
                                     <th>要素タイプ</th>
-                                    <th>長さ</th>
-                                    <th>幅</th>
-                                    <th>高さ</th>
+                                    <th>長さ (mm)</th>
+                                    <th>幅 (mm)</th>
+                                    <th>高さ (mm)</th>
                                 </tr>
                             </thead>
                             <tbody id="resultTable">
