@@ -137,62 +137,59 @@ def process_materials():
             }), 404
 
         logger.info(f"Processing IFC file: {filepath}")
-        processor = IFCProcessor(filepath)
-        materials = processor.extract_material_sizes()
 
-        if not materials:
-            logger.warning("No materials extracted from file")
+        try:
+            processor = IFCProcessor(filepath)
+            materials = processor.extract_material_sizes()
+
+            if not materials:
+                logger.warning("No materials extracted")
+                return jsonify({
+                    'success': False,
+                    'message': '材料情報を抽出できませんでした。'
+                }), 400
+
+            logger.info(f"Extracted {len(materials)} materials")
+
+            # 処理結果を保存
+            result = ProcessResult(
+                ifc_file_id=ifc_file.id,
+                user_id=current_user.id,
+                processing_date=datetime.utcnow()
+            )
+            result.set_material_data(materials)
+
+            ifc_file.processed = True
+            db.session.add(result)
+            db.session.commit()
+
+            logger.info("Processing results saved to database")
+
+            return jsonify({
+                'success': True,
+                'materials': materials,
+                'message': '材料集計が完了しました。'
+            })
+
+        except ValueError as ve:
+            logger.error(f"Value error during processing: {str(ve)}")
             return jsonify({
                 'success': False,
-                'message': '材料情報を抽出できませんでした。'
+                'message': str(ve)
             }), 400
 
-        logger.info(f"Extracted {len(materials)} materials")
-
-        # 材料情報をJSONシリアライズ可能な形式に変換
-        materials_json = []
-        for material in materials:
-            material_dict = {}
-            for key, value in material.items():
-                try:
-                    if isinstance(value, (int, float)):
-                        material_dict[key] = float(value)
-                    elif value is None:
-                        material_dict[key] = None
-                    else:
-                        material_dict[key] = str(value)
-                except Exception as conv_error:
-                    logger.warning(f"Error converting value for key {key}: {str(conv_error)}")
-                    material_dict[key] = str(value)
-            materials_json.append(material_dict)
-
-        # 処理結果を保存
-        result = ProcessResult(
-            ifc_file_id=ifc_file.id,
-            user_id=current_user.id,
-            processing_date=datetime.utcnow()
-        )
-        result.set_material_data(materials_json)
-
-        ifc_file.processed = True
-        db.session.add(result)
-        db.session.commit()
-
-        logger.info("Processing results saved to database")
-
-        response_data = {
-            'success': True,
-            'materials': materials_json,
-            'message': '材料集計が完了しました。'
-        }
-
-        return jsonify(response_data)
+        except Exception as e:
+            logger.error(f"Error during processing: {str(e)}", exc_info=True)
+            return jsonify({
+                'success': False,
+                'message': '処理中にエラーが発生しました。'
+            }), 500
 
     except Exception as e:
-        logger.error(f"Error during material processing: {str(e)}", exc_info=True)
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
         return jsonify({
             'success': False,
-            'message': '処理中にエラーが発生しました。'
+            'message': '予期せぬエラーが発生しました。'
         }), 500
 
 @main_bp.route('/results')

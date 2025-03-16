@@ -3,9 +3,9 @@ import csv
 import logging
 from io import StringIO
 from decimal import Decimal
-import json
 import os
 
+# ロギングの設定を詳細にする
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
@@ -26,80 +26,87 @@ class IFCProcessor:
         if not self.ifc_file:
             raise ValueError("IFCファイルが読み込まれていません。")
 
-        materials = []
         try:
-            # 構造要素の取得
-            elements = []
-            element_types = [
-                'IfcBeam', 'IfcColumn', 'IfcPlate', 'IfcMember',
-                'IfcStructuralCurveMember', 'IfcStructuralSurfaceMember'
-            ]
+            materials = []
+            element_types = ['IfcBeam', 'IfcColumn', 'IfcPlate', 'IfcMember']
 
             for element_type in element_types:
-                elements.extend(self.ifc_file.by_type(element_type) or [])
+                logger.debug(f"Processing elements of type: {element_type}")
+                elements = self.ifc_file.by_type(element_type)
 
-            logger.info(f"Found {len(elements)} elements to process")
+                for element in elements:
+                    try:
+                        # 基本情報の取得
+                        info = {
+                            'name': str(element.Name) if hasattr(element, 'Name') else None,
+                            'element_type': str(element.is_a()),
+                        }
 
-            for element in elements:
-                try:
-                    info = {
-                        'name': getattr(element, 'Name', None),
-                        'element_type': element.is_a(),
-                        'global_id': getattr(element, 'GlobalId', None)
-                    }
+                        # プロファイル情報の取得
+                        if hasattr(element, 'Representation'):
+                            for rep in element.Representation.Representations:
+                                for item in rep.Items:
+                                    if hasattr(item, 'SweptArea'):
+                                        profile = item.SweptArea
+                                        if profile.is_a('IfcIShapeProfileDef'):
+                                            info.update({
+                                                'profile_type': 'I形鋼',
+                                                'overall_depth': float(profile.OverallDepth or 0),
+                                                'flange_width': float(profile.OverallWidth or 0),
+                                                'web_thickness': float(profile.WebThickness or 0),
+                                                'flange_thickness': float(profile.FlangeThickness or 0)
+                                            })
+                                        elif profile.is_a('IfcRectangleProfileDef'):
+                                            info.update({
+                                                'profile_type': '矩形',
+                                                'width': float(profile.XDim or 0),
+                                                'height': float(profile.YDim or 0)
+                                            })
 
-                    # プロファイル情報の取得
-                    if hasattr(element, 'Representation'):
-                        for rep in element.Representation.Representations:
-                            for item in rep.Items:
-                                if hasattr(item, 'SweptArea'):
-                                    profile = item.SweptArea
-                                    if profile.is_a('IfcIShapeProfileDef'):
-                                        info.update({
-                                            'profile_type': 'I形鋼',
-                                            'overall_depth': float(profile.OverallDepth),
-                                            'flange_width': float(profile.OverallWidth),
-                                            'web_thickness': float(profile.WebThickness),
-                                            'flange_thickness': float(profile.FlangeThickness)
-                                        })
-                                        break
-                                    elif profile.is_a('IfcRectangleProfileDef'):
-                                        info.update({
-                                            'profile_type': '矩形',
-                                            'width': float(profile.XDim),
-                                            'height': float(profile.YDim)
-                                        })
-                                        break
+                        # 材料情報の取得
+                        if hasattr(element, 'HasAssociations'):
+                            for rel in element.HasAssociations:
+                                if rel.is_a('IfcRelAssociatesMaterial'):
+                                    material = rel.RelatingMaterial
+                                    if material.is_a('IfcMaterial'):
+                                        info['material_name'] = str(material.Name)
 
-                    # 材料情報の取得
-                    for rel in element.HasAssociations:
-                        if rel.is_a('IfcRelAssociatesMaterial'):
-                            material = rel.RelatingMaterial
-                            if material.is_a('IfcMaterial'):
-                                info['material_name'] = material.Name
-                                break
+                        # プロパティ情報の取得
+                        if hasattr(element, 'IsDefinedBy'):
+                            for definition in element.IsDefinedBy:
+                                if definition.is_a('IfcRelDefinesByProperties'):
+                                    props = definition.RelatingPropertyDefinition
+                                    if props.is_a('IfcPropertySet'):
+                                        for prop in props.HasProperties:
+                                            if prop.Name in ['Grade', 'NominalDiameter', 'Length']:
+                                                if hasattr(prop, 'NominalValue'):
+                                                    try:
+                                                        value = float(prop.NominalValue.wrappedValue)
+                                                        info[prop.Name.lower()] = value
+                                                    except (ValueError, TypeError):
+                                                        info[prop.Name.lower()] = None
 
-                    # プロパティ情報の取得
-                    for definition in element.IsDefinedBy:
-                        if definition.is_a('IfcRelDefinesByProperties'):
-                            props = definition.RelatingPropertyDefinition
-                            if props.is_a('IfcPropertySet'):
-                                for prop in props.HasProperties:
-                                    if prop.Name in ['Grade', 'NominalDiameter', 'Length']:
-                                        if hasattr(prop, 'NominalValue'):
-                                            info[prop.Name.lower()] = prop.NominalValue.wrappedValue
+                        # 数値データの確認と変換
+                        for key, value in info.items():
+                            if isinstance(value, (int, float, Decimal)):
+                                info[key] = float(value)
+                            elif value is None:
+                                info[key] = None
+                            else:
+                                info[key] = str(value)
 
-                    materials.append(info)
-                    logger.debug(f"Processed element: {info['global_id']}")
+                        materials.append(info)
+                        logger.debug(f"Successfully processed element: {info.get('name', 'unnamed')}")
 
-                except Exception as e:
-                    logger.warning(f"Error processing element: {str(e)}")
-                    continue
+                    except Exception as elem_error:
+                        logger.error(f"Error processing element: {str(elem_error)}", exc_info=True)
+                        continue
 
+            logger.info(f"Successfully processed {len(materials)} materials")
             return materials
 
         except Exception as e:
-            logger.error(f"Error extracting materials: {str(e)}", exc_info=True)
+            logger.error(f"Error in extract_material_sizes: {str(e)}", exc_info=True)
             raise ValueError(f"材料データの抽出中にエラーが発生しました: {str(e)}")
 
     def _process_element(self, element):
@@ -271,10 +278,10 @@ class IFCProcessor:
 
             for material in materials:
                 try:
-                    row = {k: v for k, v in material.items() if k in fieldnames}
+                    row = {k: (v if v is not None else '') for k, v in material.items() if k in fieldnames}
                     writer.writerow(row)
                 except Exception as e:
-                    logger.warning(f"Error writing row: {str(e)}")
+                    logger.error(f"Error writing CSV row: {str(e)}", exc_info=True)
                     continue
 
             return output.getvalue()
