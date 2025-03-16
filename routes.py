@@ -58,36 +58,13 @@ def upload_ifc():
             CHUNK_SIZE = 1 * 1024 * 1024  # 1MB chunks
             with open(filepath, 'wb') as f:
                 bytes_written = 0
-                file_size = 0
-                try:
-                    # ファイルサイズを取得
-                    file.seek(0, 2)  # ファイルの末尾に移動
-                    file_size = file.tell()  # 現在の位置（＝ファイルサイズ）を取得
-                    file.seek(0)  # ファイルポインタを先頭に戻す
-                    logger.info(f"File size: {file_size} bytes")
-                except:
-                    logger.warning("Could not determine file size")
-
                 while True:
-                    try:
-                        chunk = file.stream.read(CHUNK_SIZE)
-                        if not chunk:
-                            break
-                        f.write(chunk)
-                        f.flush()  # バッファをディスクに書き込む
-                        bytes_written += len(chunk)
-                        if file_size:
-                            progress = (bytes_written / file_size) * 100
-                            logger.debug(f"Progress: {progress:.2f}% ({bytes_written}/{file_size} bytes)")
-                            # 進捗情報をレスポンスヘッダーに含める
-                            if request.environ.get('wsgi.multithread', False):
-                                response = Response()
-                                response.headers['X-Progress'] = str(progress)
-                                response.direct_passthrough = True
-
-                    except Exception as chunk_error:
-                        logger.error(f"Error writing chunk: {str(chunk_error)}", exc_info=True)
-                        raise
+                    chunk = file.stream.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    f.flush()  # バッファをディスクに書き込む
+                    bytes_written += len(chunk)
 
                 logger.info(f"File saved successfully, total size: {bytes_written} bytes")
 
@@ -156,19 +133,31 @@ def process_materials():
         materials = processor.extract_material_sizes()
         logger.info(f"Extracted {len(materials)} materials")
 
+        # 材料情報をJSONシリアライズ可能な形式に変換
+        materials_json = []
+        for material in materials:
+            material_dict = {}
+            for key, value in material.items():
+                if isinstance(value, (int, float, str, bool, type(None))):
+                    material_dict[key] = value
+                else:
+                    material_dict[key] = str(value)
+            materials_json.append(material_dict)
+
         # 処理結果を保存
         result = ProcessResult(
             ifc_file_id=ifc_file.id,
-            user_id=current_user.id
+            user_id=current_user.id,
+            processing_date=datetime.utcnow()
         )
-        result.set_material_data(materials)
+        result.set_material_data(materials_json)
 
         ifc_file.processed = True
         db.session.add(result)
         db.session.commit()
         logger.info("Processing results saved to database")
 
-        return jsonify({'success': True, 'materials': materials})
+        return jsonify({'success': True, 'materials': materials_json})
     except Exception as e:
         logger.error(f"Error during material processing: {str(e)}", exc_info=True)
         return jsonify({'success': False, 'message': str(e)})
