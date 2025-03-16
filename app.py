@@ -2,7 +2,7 @@ import os
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.ext.declarative import declarative_base
 
 # プロジェクトのルートディレクトリを取得
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -12,9 +12,7 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-class Base(DeclarativeBase):
-    pass
-
+Base = declarative_base()
 db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 
