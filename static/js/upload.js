@@ -13,19 +13,34 @@ document.addEventListener('DOMContentLoaded', function() {
     uploadForm.addEventListener('submit', async function(e) {
         e.preventDefault();
 
+        const file = document.getElementById('ifc_file').files[0];
+        if (!file) {
+            alert('ファイルを選択してください。');
+            return;
+        }
+
+        // ファイルサイズチェック (200MB)
+        const maxSize = 200 * 1024 * 1024;
+        if (file.size > maxSize) {
+            alert('ファイルサイズが大きすぎます（上限: 200MB）');
+            return;
+        }
+
         const formData = new FormData(uploadForm);
         uploadProgress.classList.remove('d-none');
         uploadBtn.disabled = true;
+        processBtn.disabled = true;
+        downloadBtn.disabled = true;
         progressBar.style.width = '0%';
 
         try {
             let progress = 0;
             const progressInterval = setInterval(() => {
-                progress += 10;
-                if (progress <= 90) {
+                progress += 2;  // より遅い進行を示す
+                if (progress <= 90) {  // 90%まで表示
                     progressBar.style.width = `${progress}%`;
                 }
-            }, 200);
+            }, 1000);  // 1秒ごとに更新
 
             const response = await fetch('/upload/ifc', {
                 method: 'POST',
@@ -47,7 +62,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(() => {
                     uploadProgress.classList.add('d-none');
                     processBtn.disabled = false;
-                    uploadBtn.disabled = false;
                 }, 500);
 
                 if (data.message) {
@@ -62,6 +76,10 @@ document.addEventListener('DOMContentLoaded', function() {
             uploadBtn.disabled = false;
             progressBar.style.width = '0%';
             alert(error.message || 'エラーが発生しました。');
+        } finally {
+            uploadBtn.disabled = false;
+            processBtn.disabled = false;
+            downloadBtn.disabled = false;
         }
     });
 

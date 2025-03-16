@@ -5,7 +5,7 @@ from flask import Blueprint, render_template, request, jsonify, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
-from app import db
+from app import db, UPLOAD_FOLDER
 from models import IFCFile, ProcessResult
 from ifc_processor import IFCProcessor
 
@@ -14,11 +14,6 @@ logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 main_bp = Blueprint('main', __name__)
-
-UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-    logger.info(f"Created upload folder: {UPLOAD_FOLDER}")
 
 @main_bp.route('/')
 @main_bp.route('/main')
@@ -46,11 +41,6 @@ def upload_ifc():
             logger.warning(f"Invalid file type: {file.filename}")
             return jsonify({'success': False, 'message': 'IFCファイルのみアップロード可能です。'})
 
-        # アップロードフォルダの確認と作成
-        if not os.path.exists(UPLOAD_FOLDER):
-            logger.info("Creating upload folder")
-            os.makedirs(UPLOAD_FOLDER)
-
         filename = secure_filename(file.filename)
         filepath = os.path.join(UPLOAD_FOLDER, filename)
 
@@ -63,18 +53,46 @@ def upload_ifc():
             filepath = os.path.join(UPLOAD_FOLDER, filename)
             counter += 1
 
-        logger.info(f"Saving file to: {filepath}")
-        file.save(filepath)
-        logger.info("File saved successfully")
+        logger.info(f"Attempting to save file to: {filepath}")
+        try:
+            # ファイルを大きなチャンクで読み書き
+            CHUNK_SIZE = 4 * 1024 * 1024  # 4MB chunks
+            with open(filepath, 'wb') as f:
+                bytes_written = 0
+                while True:
+                    chunk = file.stream.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    bytes_written += len(chunk)
+                    logger.debug(f"Written {bytes_written} bytes")
+                logger.info(f"File saved successfully, total size: {bytes_written} bytes")
+        except Exception as save_error:
+            logger.error(f"Error saving file: {str(save_error)}", exc_info=True)
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except Exception as remove_error:
+                    logger.error(f"Error removing failed upload: {str(remove_error)}")
+            return jsonify({'success': False, 'message': 'ファイルの保存中にエラーが発生しました。'})
 
-        ifc_file = IFCFile(
-            filename=filename,
-            user_id=current_user.id,
-            upload_date=datetime.utcnow()
-        )
-        db.session.add(ifc_file)
-        db.session.commit()
-        logger.info("File record created in database")
+        try:
+            ifc_file = IFCFile(
+                filename=filename,
+                user_id=current_user.id,
+                upload_date=datetime.utcnow()
+            )
+            db.session.add(ifc_file)
+            db.session.commit()
+            logger.info("File record created in database")
+        except Exception as db_error:
+            logger.error(f"Error creating database record: {str(db_error)}", exc_info=True)
+            if os.path.exists(filepath):
+                try:
+                    os.remove(filepath)
+                except Exception as remove_error:
+                    logger.error(f"Error removing file after db failure: {str(remove_error)}")
+            return jsonify({'success': False, 'message': 'データベースの更新中にエラーが発生しました。'})
 
         return jsonify({'success': True, 'message': 'ファイルのアップロードが完了しました。'})
     except RequestEntityTooLarge:

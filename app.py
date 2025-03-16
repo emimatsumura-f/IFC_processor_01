@@ -5,7 +5,7 @@ from flask_login import LoginManager
 from sqlalchemy.orm import DeclarativeBase
 
 # アップロードフォルダの作成
-UPLOAD_FOLDER = 'uploads'
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
